@@ -1,0 +1,96 @@
+# Miren Work Assistant 配置文件
+# 复制此文件到 ~/.miren-work/config.yaml 并根据实际情况修改
+
+# 用户信息
+user:
+  name: "Your Name"           # 你的姓名（用于邮件匹配）
+  email: "you@company.com"    # 你的邮箱地址
+  team: "Your Team"           # 所属团队
+  # 时区设置 - 用于将 UTC 定时任务时间转换为本地时间显示
+  # 常用时区: Asia/Shanghai (UTC+8), Asia/Dubai (UTC+4), America/New_York (UTC-5)
+  # 完整列表: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+  timezone: "Asia/Shanghai"
+
+# 邮件配置
+email:
+  default_folder: "inbox"     # 默认邮件文件夹
+  cache_days: 7               # 邮件缓存天数
+
+  # 重要发件人列表（这些人的邮件会被标记为重要）
+  important_senders:
+    - "boss@company.com"
+    - "team-lead@company.com"
+    - "hr@company.com"
+
+  # 重要关键词（邮件主题包含这些词会被标记为重要）
+  important_keywords:
+    - "工单"
+    - "紧急"
+    - "URGENT"
+    - "ASAP"
+    - "告警"
+    - "Alert"
+
+  # 忽略的发件人（这些邮件会被跳过）
+  ignore_senders:
+    - "noreply@"
+    - "no-reply@"
+    - "notifications@"
+
+# 定时任务配置 (UTC 时间，本地时间根据上方 timezone 设置自动转换显示)
+cron:
+  # 晨报时间
+  morning_report: "30 5 * * *"      # UTC 05:30
+
+  # 邮件检查时间
+  email_check: "0 6-15 * * *"       # UTC 06:00-15:00 每小时
+
+  # 每日工作总结时间
+  daily_summary: "0 14 * * *"       # UTC 14:00
+
+  # 静默时间（不发送通知，UTC 时间）
+  silent_start: "16:00"             # UTC 16:00
+  silent_end: "05:30"               # UTC 05:30
+
+# 通知配置
+notification:
+  telegram:
+    enabled: false                  # 是否启用 Telegram 通知
+    bot_token: ""                   # Telegram Bot Token (也可通过环境变量 TELEGRAM_BOT_TOKEN 设置)
+    chat_id: "YOUR_CHAT_ID"         # Telegram Chat ID
+
+# 汇报模板配置
+report:
+  templates:
+    morning: "default"              # 晨报模板
+    daily: "default"                # 日报模板
+    weekly: "default"               # 周报模板
+
+  # 自动包含的内容
+  auto_include:
+    system_status: true             # 系统状态
+    email_summary: true             # 邮件摘要
+    todo_stats: true                # 待办统计
+
+# 待办任务配置
+todo:
+  default_priority: "P2"            # 默认优先级
+
+  # 任务分类
+  categories:
+    - "开发"
+    - "运维"
+    - "会议"
+    - "文档"
+    - "沟通"
+    - "其他"
+
+  # 自动归档已完成任务的天数
+  auto_archive_days: 7
+
+# MCP 服务器配置
+mcp:
+  ms365:
+    # ms-365-mcp-server 配置
+    # 需要在 Claude Code 的 MCP 配置中添加此服务器
+    enabled: true
