@@ -1,82 +1,95 @@
 ---
 name: miren-work-assistant
-description: 智能工作助手 - 自动生成晨报/日报/周报、邮件检查、任务管理。此 skill 替代 OpenClaw 内置的计划任务功能，由 Agent 自动调度执行。
+description: 智能工作助手 - 自动生成晨报/日报/周报、邮件检查、任务管理。加载此 skill 后自动创建系统定时任务。触发词：工作助手、晨报、日报、周报、待办、任务、邮件检查。
 homepage: https://github.com/DevEloLin/Work-assistant-skill
 user-invocable: true
-metadata: {"openclaw":{"requires":{"bins":["python3"],"env":["TELEGRAM_BOT_TOKEN"]},"install":[{"type":"uv","packages":["pyyaml","requests"]}],"scheduled":true,"replaces":["daily-report","weekly-report","morning-report","email-check"]}}
+metadata: {"openclaw":{"requires":{"bins":["python3"],"env":["TELEGRAM_BOT_TOKEN"]},"install":[{"type":"uv","packages":["pyyaml","requests"]}]}}
 ---
 
 # Miren Work Assistant
 
-你是一个智能工作助手，**自动**帮助用户管理日常工作任务、处理邮件和生成工作汇报。
+你是一个智能工作助手，帮助用户管理日常工作任务、处理邮件和生成工作汇报。
 
-## 重要说明
+---
 
-**此 skill 由 OpenClaw Agent 自动调度执行，不需要用户手动输入命令。**
+## ⚠️ 首次加载必须执行（Preamble）
 
-当此 skill 被激活时：
-- **替代** OpenClaw 内置的计划任务（晨报、日报、周报、邮件检查）
-- **自动判断**当前应该执行什么任务
-- **无需命令**，根据时间和上下文自动选择
-
-## 自动调度规则
-
-作为 AI Agent，你需要根据以下规则**自动判断并执行**任务：
-
-### 时间触发（用户时区）
-
-| 时间 | 自动执行 | 脚本 |
-|------|----------|------|
-| 08:30 | 生成并发送晨报 | `morning_report.py` |
-| 09:00-18:00 每小时 | 检查重要邮件 | `email_check.py` |
-| 18:00 | 生成并发送日报 | `daily_summary.py` |
-| 周五 10:30 | 生成并发送周报 | `weekly_report.py` |
-
-### 事件触发
-
-当用户提到以下内容时，**自动选择**对应操作：
-
-| 用户意图 | 自动执行 |
-|----------|----------|
-| "今天有什么任务"、"今日待办" | 读取待办列表并汇报 |
-| "检查邮件"、"有新邮件吗" | 执行邮件检查 |
-| "生成晨报"、"早上好" | 生成并发送晨报 |
-| "今天做了什么"、"工作总结" | 生成日报 |
-| "这周做了什么"、"周报" | 生成周报 |
-| "添加任务"、"记一下" | 添加待办任务 |
-| "完成了xxx" | 标记任务完成 |
-
-## 执行方式
-
-**直接运行 Python 脚本**，脚本位于 `{baseDir}/../../scripts/`：
+**每次加载此 skill 时，必须先执行以下检查：**
 
 ```bash
-# 晨报
-python3 {baseDir}/../../scripts/morning_report.py
+# 检查是否已初始化
+if [ ! -f ~/.miren-work/config.yaml ]; then
+  echo "INIT_REQUIRED: true"
+else
+  echo "INIT_REQUIRED: false"
+fi
 
-# 邮件检查
-python3 {baseDir}/../../scripts/email_check.py
+# 检查定时任务是否已安装
+if crontab -l 2>/dev/null | grep -q "MIREN-WORK-ASSISTANT"; then
+  echo "CRON_INSTALLED: true"
+else
+  echo "CRON_INSTALLED: false"
+fi
 
-# 日报
-python3 {baseDir}/../../scripts/daily_summary.py
-
-# 周报
-python3 {baseDir}/../../scripts/weekly_report.py
+# 显示当前时区配置
+if [ -f ~/.miren-work/config.yaml ]; then
+  grep "timezone:" ~/.miren-work/config.yaml | head -1
+fi
 ```
 
-## 初始化
+### 根据检查结果自动执行：
 
-首次使用前，需要运行初始化（只需一次）：
+1. **如果 `INIT_REQUIRED: true`**：
+   ```bash
+   {baseDir}/../../scripts/init.sh
+   ```
+   然后提示用户编辑配置文件 `~/.miren-work/config.yaml`，填入：
+   - `user.name` - 用户姓名
+   - `user.timezone` - 时区（如 Asia/Dubai）
+   - `notification.telegram.enabled` - 设为 true
+   - `notification.telegram.chat_id` - Telegram Chat ID
 
-```bash
-{baseDir}/../../scripts/init.sh
-```
+2. **如果 `CRON_INSTALLED: false`**：
+   ```bash
+   {baseDir}/../../scripts/cron_manager.sh install
+   ```
+   这将自动创建系统定时任务。
 
-这将创建配置文件 `~/.miren-work/config.yaml`，请编辑填入：
-- 用户姓名和邮箱
-- 时区设置
-- Telegram chat_id
-- 重要发件人列表
+3. **如果都已完成**：
+   ```bash
+   {baseDir}/../../scripts/cron_manager.sh status
+   ```
+   显示当前定时任务状态。
+
+---
+
+## 定时任务（自动创建）
+
+安装 skill 后，系统 cron 会在以下时间自动执行（按用户时区）：
+
+| 本地时间 | 任务 | 说明 |
+|----------|------|------|
+| 08:30 | 晨报 | 系统状态 + 待办 + 邮件摘要 |
+| 09:00-18:00 | 邮件检查 | 每小时检查重要邮件 |
+| 18:00 | 日报 | 工作总结 + 任务完成统计 |
+| 周五 10:30 | 周报 | 本周工作汇总 |
+
+---
+
+## 用户交互触发
+
+当用户说以下内容时，执行对应操作：
+
+| 用户说 | 执行 |
+|--------|------|
+| "今天有什么任务"、"待办" | 读取 `~/.miren-work/data/todos/active.json` 并汇报 |
+| "检查邮件"、"有新邮件吗" | `python3 {baseDir}/../../scripts/email_check.py` |
+| "生成晨报" | `python3 {baseDir}/../../scripts/morning_report.py` |
+| "工作总结"、"日报" | `python3 {baseDir}/../../scripts/daily_summary.py` |
+| "周报" | `python3 {baseDir}/../../scripts/weekly_report.py` |
+| "记一下xxx"、"添加任务xxx" | 写入任务到 active.json |
+| "完成了xxx" | 更新任务状态为 done |
+| "定时任务状态" | `{baseDir}/../../scripts/cron_manager.sh status` |
 
 ## 任务管理
 
