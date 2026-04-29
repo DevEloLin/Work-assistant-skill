@@ -160,12 +160,12 @@ install_cron() {
     # 移除旧的 miren-work 任务
     grep -v "$CRON_TAG" /tmp/current_cron > /tmp/new_cron 2>/dev/null || true
 
-    # 添加新任务
+    # 添加新任务 - 触发 OpenClaw Agent 执行
     cat >> /tmp/new_cron << EOF
-$morning_cron $PYTHON $SCRIPT_DIR/morning_report.py >> $LOG_FILE 2>&1 $CRON_TAG
-$email_cron $PYTHON $SCRIPT_DIR/email_check.py >> $LOG_FILE 2>&1 $CRON_TAG
-$daily_cron $PYTHON $SCRIPT_DIR/daily_summary.py >> $LOG_FILE 2>&1 $CRON_TAG
-$weekly_cron $PYTHON $SCRIPT_DIR/weekly_report.py >> $LOG_FILE 2>&1 $CRON_TAG
+$morning_cron $PYTHON $SCRIPT_DIR/trigger_agent.py morning >> $LOG_FILE 2>&1 $CRON_TAG
+$email_cron $PYTHON $SCRIPT_DIR/trigger_agent.py email >> $LOG_FILE 2>&1 $CRON_TAG
+$daily_cron $PYTHON $SCRIPT_DIR/trigger_agent.py daily >> $LOG_FILE 2>&1 $CRON_TAG
+$weekly_cron $PYTHON $SCRIPT_DIR/trigger_agent.py weekly >> $LOG_FILE 2>&1 $CRON_TAG
 EOF
 
     # 安装新 crontab
