@@ -7,6 +7,8 @@
 # - 邮件检查: 本地 09:00-18:00 每小时
 # - 日报: 本地 18:00
 # - 周报: 本地 10:30 (周五)
+#
+# 直接调用 Agent CLI (openclaw/claude) 执行任务
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MIREN_WORK_DIR="$HOME/.miren-work"
@@ -16,8 +18,27 @@ CRON_TAG="# MIREN-WORK-ASSISTANT"
 # 确保目录存在
 mkdir -p "$MIREN_WORK_DIR/data/logs"
 
-# Python 解释器路径
+# Python 解释器路径（仅用于时区转换）
 PYTHON=$(which python3)
+
+# 检测 Agent CLI
+detect_agent_cli() {
+    if command -v openclaw &> /dev/null; then
+        echo "openclaw"
+    elif command -v claude &> /dev/null; then
+        echo "claude"
+    else
+        echo ""
+    fi
+}
+
+AGENT_CLI=$(detect_agent_cli)
+
+# 任务提示词
+PROMPT_MORNING="请生成今日晨报"
+PROMPT_EMAIL="请检查邮件"
+PROMPT_DAILY="请生成今日工作总结"
+PROMPT_WEEKLY="请生成本周周报"
 
 # 本地时间定义（用户期望的执行时间）
 LOCAL_MORNING_TIME="08:30"        # 晨报
@@ -140,6 +161,16 @@ get_cron_jobs() {
 install_cron() {
     log "安装定时任务..."
 
+    # 检查 Agent CLI
+    local agent=$(detect_agent_cli)
+    if [ -z "$agent" ]; then
+        echo "错误: 未找到 Agent CLI (openclaw 或 claude)"
+        echo "请先安装 OpenClaw 或 Claude Code"
+        exit 1
+    fi
+    local agent_path=$(which $agent)
+    log "使用 Agent CLI: $agent_path"
+
     local tz=$(get_timezone)
     log "使用时区: $tz"
 
@@ -160,12 +191,12 @@ install_cron() {
     # 移除旧的 miren-work 任务
     grep -v "$CRON_TAG" /tmp/current_cron > /tmp/new_cron 2>/dev/null || true
 
-    # 添加新任务 - 触发 OpenClaw Agent 执行
+    # 添加新任务 - 直接调用 Agent CLI 执行
     cat >> /tmp/new_cron << EOF
-$morning_cron $PYTHON $SCRIPT_DIR/trigger_agent.py morning >> $LOG_FILE 2>&1 $CRON_TAG
-$email_cron $PYTHON $SCRIPT_DIR/trigger_agent.py email >> $LOG_FILE 2>&1 $CRON_TAG
-$daily_cron $PYTHON $SCRIPT_DIR/trigger_agent.py daily >> $LOG_FILE 2>&1 $CRON_TAG
-$weekly_cron $PYTHON $SCRIPT_DIR/trigger_agent.py weekly >> $LOG_FILE 2>&1 $CRON_TAG
+$morning_cron $agent_path -p "$PROMPT_MORNING" --allowedTools "Bash,Read,Write,Edit,Glob,Grep" >> $LOG_FILE 2>&1 $CRON_TAG
+$email_cron $agent_path -p "$PROMPT_EMAIL" --allowedTools "Bash,Read,Write,Edit,Glob,Grep" >> $LOG_FILE 2>&1 $CRON_TAG
+$daily_cron $agent_path -p "$PROMPT_DAILY" --allowedTools "Bash,Read,Write,Edit,Glob,Grep" >> $LOG_FILE 2>&1 $CRON_TAG
+$weekly_cron $agent_path -p "$PROMPT_WEEKLY" --allowedTools "Bash,Read,Write,Edit,Glob,Grep" >> $LOG_FILE 2>&1 $CRON_TAG
 EOF
 
     # 安装新 crontab
@@ -176,6 +207,7 @@ EOF
     echo ""
     echo "已安装的定时任务:"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Agent CLI: $agent_path"
     echo "时区: $tz"
     echo ""
     echo "1. 每日晨报:     本地 $LOCAL_MORNING_TIME"
@@ -183,7 +215,7 @@ EOF
     echo "3. 每日工作总结: 本地 $LOCAL_DAILY_TIME"
     echo "4. 周报生成:     本地 $LOCAL_WEEKLY_TIME (周五)"
     echo ""
-    echo "注意: Cron 任务已转换为 UTC 时间执行"
+    echo "注意: Cron 任务直接调用 $agent 执行"
     echo ""
 }
 
@@ -210,16 +242,25 @@ show_status() {
 
     local jobs=$(get_cron_jobs)
     local tz=$(get_timezone)
+    local agent=$(detect_agent_cli)
+
+    # Agent CLI 状态
+    if [ -n "$agent" ]; then
+        echo "Agent CLI: ✅ $agent ($(which $agent))"
+    else
+        echo "Agent CLI: ❌ 未找到 (需要 openclaw 或 claude)"
+    fi
+    echo ""
 
     if [ -z "$jobs" ]; then
-        echo "状态: ❌ 未安装"
+        echo "Cron 状态: ❌ 未安装"
         echo ""
         echo "使用 './cron_manager.sh install' 安装定时任务"
     else
-        echo "状态: ✅ 运行中"
+        echo "Cron 状态: ✅ 运行中"
         echo "时区: $tz"
         echo ""
-        echo "已安装的任务 (Cron UTC 时间):"
+        echo "已安装的任务:"
         echo "$jobs" | while read line; do
             echo "  • $line"
         done
@@ -245,29 +286,40 @@ show_status() {
 
 run_now() {
     local task=$1
+    local agent=$(detect_agent_cli)
+
+    if [ -z "$agent" ]; then
+        echo "错误: 未找到 Agent CLI (openclaw 或 claude)"
+        exit 1
+    fi
+
+    local prompt=""
     case $task in
         morning)
             log "手动执行晨报..."
-            $PYTHON "$SCRIPT_DIR/morning_report.py"
+            prompt="$PROMPT_MORNING"
             ;;
         email)
             log "手动执行邮件检查..."
-            $PYTHON "$SCRIPT_DIR/email_check.py"
+            prompt="$PROMPT_EMAIL"
             ;;
-        summary)
+        summary|daily)
             log "手动执行工作总结..."
-            $PYTHON "$SCRIPT_DIR/daily_summary.py"
+            prompt="$PROMPT_DAILY"
             ;;
         weekly)
             log "手动执行周报..."
-            $PYTHON "$SCRIPT_DIR/weekly_report.py"
+            prompt="$PROMPT_WEEKLY"
             ;;
         *)
             echo "未知任务: $task"
-            echo "可用任务: morning, email, summary, weekly"
+            echo "可用任务: morning, email, summary (daily), weekly"
             exit 1
             ;;
     esac
+
+    echo "执行: $agent -p \"$prompt\""
+    $agent -p "$prompt" --allowedTools "Bash,Read,Write,Edit,Glob,Grep"
 }
 
 case "$1" in
@@ -296,14 +348,21 @@ case "$1" in
         echo ""
         echo "可执行任务:"
         echo "  morning   每日晨报"
-        echo "  email     邮件检查"
-        echo "  summary   每日工作总结"
+        echo "  email     邮件检查 (通过 MCP 读取邮件)"
+        echo "  summary   每日工作总结 (别名: daily)"
         echo "  weekly    周报生成"
+        echo ""
+        local agent=$(detect_agent_cli)
+        if [ -n "$agent" ]; then
+            echo "检测到 Agent CLI: $agent"
+        else
+            echo "警告: 未检测到 Agent CLI (openclaw 或 claude)"
+        fi
         echo ""
         echo "示例:"
         echo "  $0 install          # 安装定时任务"
         echo "  $0 status           # 查看状态"
-        echo "  $0 run morning      # 手动执行晨报"
-        echo "  $0 run weekly       # 手动执行周报"
+        echo "  $0 run morning      # 执行晨报"
+        echo "  $0 run email        # 执行邮件检查"
         ;;
 esac

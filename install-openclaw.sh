@@ -42,7 +42,6 @@ cp -r "$SCRIPT_DIR/templates" "$SKILL_DIR/"
 
 # 设置脚本可执行权限
 chmod +x "$SKILL_DIR/scripts/"*.sh
-chmod +x "$SKILL_DIR/scripts/"*.py
 
 echo ""
 echo "✅ Skill 安装完成"
@@ -51,12 +50,7 @@ echo "目录结构:"
 echo "  $SKILL_DIR/"
 echo "  ├── SKILL.md"
 echo "  ├── scripts/"
-echo "  │   ├── morning_report.py"
-echo "  │   ├── email_check.py"
-echo "  │   ├── daily_summary.py"
-echo "  │   ├── weekly_report.py"
-echo "  │   ├── telegram_formatter.py"
-echo "  │   ├── cron_manager.sh"
+echo "  │   ├── cron_manager.sh    # 直接调用 Agent CLI"
 echo "  │   └── init.sh"
 echo "  └── templates/"
 echo "      └── config.yaml"

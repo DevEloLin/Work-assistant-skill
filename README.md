@@ -130,12 +130,7 @@ miren-work-assistant-skill/
 │       └── SKILL.md           # Skill 定义 (OpenClaw/Claude Code 通用)
 ├── scripts/
 │   ├── init.sh                # 初始化脚本
-│   ├── cron_manager.sh        # Cron 管理
-│   ├── morning_report.py      # 晨报生成
-│   ├── email_check.py         # 邮件检查
-│   ├── daily_summary.py       # 日报生成
-│   ├── weekly_report.py       # 周报生成
-│   └── telegram_formatter.py  # Telegram 格式化模块
+│   └── cron_manager.sh        # Cron 管理 (直接调用 Agent CLI)
 └── templates/
     └── config.yaml            # 配置模板
 
@@ -218,16 +213,6 @@ notification:
 
 # 周报
 ./scripts/cron_manager.sh run weekly
-```
-
-## 开发测试
-
-```bash
-# 直接运行脚本
-python3 scripts/morning_report.py
-python3 scripts/email_check.py
-python3 scripts/daily_summary.py
-python3 scripts/weekly_report.py
 ```
 
 ## 许可证
