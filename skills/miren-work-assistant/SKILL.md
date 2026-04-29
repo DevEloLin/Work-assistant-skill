@@ -2,7 +2,7 @@
 name: miren-work-assistant
 description: 智能工作助手 - 自动生成晨报/日报/周报、邮件检查、任务管理。此 skill 替代 OpenClaw 内置的计划任务功能，由 Agent 自动调度执行。
 homepage: https://github.com/DevEloLin/Work-assistant-skill
-user-invocable: false
+user-invocable: true
 metadata: {"openclaw":{"requires":{"bins":["python3"],"env":["TELEGRAM_BOT_TOKEN"]},"install":[{"type":"uv","packages":["pyyaml","requests"]}],"scheduled":true,"replaces":["daily-report","weekly-report","morning-report","email-check"]}}
 ---
 
