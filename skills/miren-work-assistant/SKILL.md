@@ -31,7 +31,13 @@ if [ ! -f ~/.miren-work/config.yaml ]; then
 else
   echo "INIT_REQUIRED: false"
   grep "timezone:" ~/.miren-work/config.yaml | head -1
-  grep "chat_id:" ~/.miren-work/config.yaml | head -1
+fi
+
+# 检查 OpenClaw Telegram 配置
+if [ -f ~/.openclaw/openclaw.json ]; then
+  echo "OPENCLAW_CONFIG: found"
+else
+  echo "OPENCLAW_CONFIG: not found"
 fi
 
 # 检查定时任务
@@ -53,7 +59,9 @@ SCRIPTS_DIR="$SKILL_DIR/../../scripts"
 # 运行初始化
 $SCRIPTS_DIR/init.sh
 ```
-然后告诉用户需要编辑 `~/.miren-work/config.yaml`，填入 timezone 和 telegram chat_id。
+然后告诉用户编辑 `~/.miren-work/config.yaml`，填入 `timezone`（如 Asia/Dubai）。
+
+**注意**：Telegram 配置会自动从 `~/.openclaw/openclaw.json` 读取，无需重复配置。
 
 **如果 `CRON_INSTALLED: false`**：
 ```bash
@@ -334,9 +342,21 @@ cat ~/.miren-work/data/todos/active.json 2>/dev/null || echo "[]"
 
 ---
 
-## 配置文件
+## 配置说明
 
-`~/.miren-work/config.yaml`：
+### Telegram 配置（自动读取）
+
+脚本会自动从以下位置读取 Telegram 配置（按优先级）：
+
+1. **`~/.openclaw/openclaw.json`** ← 优先（OpenClaw 已有配置）
+2. `~/.miren-work/config.yaml`
+3. 环境变量 `TELEGRAM_BOT_TOKEN`
+
+**如果你的 OpenClaw 已经配置了 Telegram，无需额外配置。**
+
+### 工作配置
+
+`~/.miren-work/config.yaml`（仅需配置时区和邮件规则）：
 
 ```yaml
 user:
@@ -350,11 +370,6 @@ email:
   important_keywords:
     - "工单"
     - "紧急"
-
-notification:
-  telegram:
-    enabled: true
-    chat_id: "YOUR_CHAT_ID"
 ```
 
 ---

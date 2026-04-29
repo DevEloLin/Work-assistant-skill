@@ -6,6 +6,7 @@
 
 import os
 import sys
+import json
 import yaml
 import requests
 from pathlib import Path
@@ -13,15 +14,67 @@ from datetime import datetime
 
 # 配置路径
 HOME = Path.home()
+OPENCLAW_CONFIG = HOME / ".openclaw" / "openclaw.json"
 MIREN_WORK_DIR = HOME / ".miren-work"
-CONFIG_FILE = MIREN_WORK_DIR / "config.yaml"
+MIREN_CONFIG_FILE = MIREN_WORK_DIR / "config.yaml"
 LOGS_DIR = MIREN_WORK_DIR / "data" / "logs"
 
 
+def load_telegram_config():
+    """
+    加载 Telegram 配置
+    优先级：
+    1. ~/.openclaw/openclaw.json
+    2. ~/.miren-work/config.yaml
+    3. 环境变量 TELEGRAM_BOT_TOKEN
+    """
+    bot_token = None
+    chat_id = None
+
+    # 1. 优先从 OpenClaw 配置读取
+    if OPENCLAW_CONFIG.exists():
+        try:
+            with open(OPENCLAW_CONFIG, 'r', encoding='utf-8') as f:
+                openclaw = json.load(f)
+                # 尝试多种可能的配置路径
+                if 'telegram' in openclaw:
+                    bot_token = openclaw['telegram'].get('bot_token') or openclaw['telegram'].get('token')
+                    chat_id = openclaw['telegram'].get('chat_id') or openclaw['telegram'].get('chatId')
+                elif 'bot_token' in openclaw:
+                    bot_token = openclaw.get('bot_token')
+                    chat_id = openclaw.get('chat_id')
+                # 也检查 notification 字段
+                elif 'notification' in openclaw:
+                    tg = openclaw['notification'].get('telegram', {})
+                    bot_token = tg.get('bot_token') or tg.get('token')
+                    chat_id = tg.get('chat_id') or tg.get('chatId')
+        except Exception as e:
+            pass
+
+    # 2. 如果 OpenClaw 没有，从 miren-work 配置读取
+    if (not bot_token or not chat_id) and MIREN_CONFIG_FILE.exists():
+        try:
+            with open(MIREN_CONFIG_FILE, 'r', encoding='utf-8') as f:
+                miren = yaml.safe_load(f) or {}
+                tg = miren.get('notification', {}).get('telegram', {})
+                if not bot_token:
+                    bot_token = tg.get('bot_token')
+                if not chat_id:
+                    chat_id = tg.get('chat_id')
+        except Exception as e:
+            pass
+
+    # 3. 环境变量作为最后的备选
+    if not bot_token:
+        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+
+    return bot_token, chat_id
+
+
 def load_config():
-    """加载配置文件"""
-    if CONFIG_FILE.exists():
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+    """加载 miren-work 配置文件"""
+    if MIREN_CONFIG_FILE.exists():
+        with open(MIREN_CONFIG_FILE, 'r', encoding='utf-8') as f:
             return yaml.safe_load(f) or {}
     return {}
 
@@ -60,16 +113,19 @@ def send_telegram_message(bot_token: str, chat_id: str, message: str) -> dict:
 
 def trigger_agent(task_type: str):
     """触发 Agent 执行指定任务"""
-    config = load_config()
+    # 获取 Telegram 配置（优先从 OpenClaw 读取）
+    bot_token, chat_id = load_telegram_config()
 
-    # 获取 Telegram 配置
-    tg_config = config.get("notification", {}).get("telegram", {})
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN") or tg_config.get("bot_token", "")
-    chat_id = tg_config.get("chat_id", "")
+    if not bot_token:
+        log_message("Telegram bot_token 未配置")
+        print("Error: Telegram bot_token not found", file=sys.stderr)
+        print("Please configure in ~/.openclaw/openclaw.json or ~/.miren-work/config.yaml", file=sys.stderr)
+        return 1
 
-    if not bot_token or not chat_id or chat_id == "YOUR_CHAT_ID":
-        log_message(f"Telegram 未配置，无法触发 Agent")
-        print("Error: Telegram not configured", file=sys.stderr)
+    if not chat_id or chat_id == "YOUR_CHAT_ID":
+        log_message("Telegram chat_id 未配置")
+        print("Error: Telegram chat_id not found", file=sys.stderr)
+        print("Please configure in ~/.openclaw/openclaw.json or ~/.miren-work/config.yaml", file=sys.stderr)
         return 1
 
     # 触发消息映射
