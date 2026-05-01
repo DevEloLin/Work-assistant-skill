@@ -35,10 +35,19 @@ detect_agent_cli() {
 AGENT_CLI=$(detect_agent_cli)
 
 # 任务提示词
-PROMPT_MORNING="请生成今日晨报"
-PROMPT_EMAIL="请检查邮件"
-PROMPT_DAILY="请生成今日工作总结"
-PROMPT_WEEKLY="请生成本周周报"
+# 链路：cron -> Agent CLI (headless) -> Agent 自己识别意图 -> 自动加载并执行 miren-work-assistant skill
+# Prompt 是纯自然语言（用户日常会说的话），不带 skill 名 / 不带 / 命令。
+# Agent 启动时会扫描已安装的 skills，根据 SKILL.md 的 description 触发词自动路由意图。
+PROMPT_MORNING="晨报"
+PROMPT_EMAIL="检查邮件"
+PROMPT_DAILY="日报"
+PROMPT_WEEKLY="周报"
+
+# Agent 工具白名单
+# - 基础文件/Shell 工具：读写任务 JSON、调用脚本
+# - mcp__*：允许调用 ms-365-mcp-server 等所有已配置的 MCP 工具（读邮件必需）
+# - Skill：允许 Agent 主动调用 miren-work-assistant skill
+ALLOWED_TOOLS="Bash,Read,Write,Edit,Glob,Grep,Skill,mcp__*"
 
 # 本地时间定义（用户期望的执行时间）
 LOCAL_MORNING_TIME="08:30"        # 晨报
@@ -192,11 +201,12 @@ install_cron() {
     grep -v "$CRON_TAG" /tmp/current_cron > /tmp/new_cron 2>/dev/null || true
 
     # 添加新任务 - 直接调用 Agent CLI 执行
+    # cron 启动 Agent (headless -p 模式)，Agent 根据 prompt 触发 miren-work-assistant skill
     cat >> /tmp/new_cron << EOF
-$morning_cron $agent_path -p "$PROMPT_MORNING" --allowedTools "Bash,Read,Write,Edit,Glob,Grep" >> $LOG_FILE 2>&1 $CRON_TAG
-$email_cron $agent_path -p "$PROMPT_EMAIL" --allowedTools "Bash,Read,Write,Edit,Glob,Grep" >> $LOG_FILE 2>&1 $CRON_TAG
-$daily_cron $agent_path -p "$PROMPT_DAILY" --allowedTools "Bash,Read,Write,Edit,Glob,Grep" >> $LOG_FILE 2>&1 $CRON_TAG
-$weekly_cron $agent_path -p "$PROMPT_WEEKLY" --allowedTools "Bash,Read,Write,Edit,Glob,Grep" >> $LOG_FILE 2>&1 $CRON_TAG
+$morning_cron $agent_path -p "$PROMPT_MORNING" --allowedTools "$ALLOWED_TOOLS" >> $LOG_FILE 2>&1 $CRON_TAG
+$email_cron $agent_path -p "$PROMPT_EMAIL" --allowedTools "$ALLOWED_TOOLS" >> $LOG_FILE 2>&1 $CRON_TAG
+$daily_cron $agent_path -p "$PROMPT_DAILY" --allowedTools "$ALLOWED_TOOLS" >> $LOG_FILE 2>&1 $CRON_TAG
+$weekly_cron $agent_path -p "$PROMPT_WEEKLY" --allowedTools "$ALLOWED_TOOLS" >> $LOG_FILE 2>&1 $CRON_TAG
 EOF
 
     # 安装新 crontab
@@ -319,7 +329,7 @@ run_now() {
     esac
 
     echo "执行: $agent -p \"$prompt\""
-    $agent -p "$prompt" --allowedTools "Bash,Read,Write,Edit,Glob,Grep"
+    $agent -p "$prompt" --allowedTools "$ALLOWED_TOOLS"
 }
 
 case "$1" in

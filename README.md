@@ -78,43 +78,32 @@ export TELEGRAM_BOT_TOKEN="your_bot_token"
 
 ## 定时任务
 
-定时任务基于 UTC 时间执行，本地时间根据配置文件中的 `user.timezone` 自动转换显示。
+定时任务按用户配置的 **本地时区** 执行（`cron_manager.sh` 自动把本地时间转成 UTC cron 表达式写入系统 crontab）。
 
-| UTC 时间 | 任务 |
+| 本地时间 | 任务 |
 |----------|------|
-| 05:30 | 每日晨报 |
-| 06:00-15:00 | 每小时邮件检查 |
-| 14:00 | 每日工作总结 |
-| 06:30 (周五) | 周报生成 |
-| 16:00-05:30 | 静默时间 |
+| 08:30 | 每日晨报 |
+| 09:00-18:00 每小时 | 邮件检查 |
+| 18:00 | 每日工作总结 |
+| 10:30 (周五) | 周报生成 |
 
-> 配置时区示例：`timezone: "Asia/Shanghai"` (UTC+8), `timezone: "Asia/Dubai"` (UTC+4)
+> 配置时区示例：`timezone: "Asia/Shanghai"` (UTC+8)、`timezone: "Asia/Dubai"` (UTC+4)
 
-## 使用命令
+## 使用方式（纯自然语言）
 
-在 Claude Code 或 OpenClaw 中使用：
+无需任何命令。直接在 Claude Code 或 OpenClaw 中说人话即可，Agent 会自动识别意图并触发本 skill 走对应流程。
 
-```bash
-# 任务管理
-/work todo add "任务内容" -p P1 -d 2026-04-30
-/work todo list
-/work todo update <ID> -s done
-
-# 邮件处理
-/work email read -n 10
-/work email summary
-/work email sent -t today --analyze
-
-# 工作汇报
-/work report morning      # 晨报
-/work report daily        # 日报（含邮件工作分析）
-/work report weekly       # 周报（聚合本周日报）
-/work summary             # 快速总结
-
-# 系统
-/work status
-/work cron status
 ```
+晨报                  → 生成晨报
+检查邮件 / 看邮件      → 检查最近邮件并更新 TODO
+日报 / 工作总结       → 生成今日工作总结
+周报 / 本周总结       → 生成本周周报
+记一下: 修复登录 bug   → 添加任务 (默认 P2)
+完成了 修复登录 bug    → 标记任务完成
+待办 / 任务列表       → 列出当前待办
+```
+
+cron 注入的 prompt 也是同样的自然语言（见 `scripts/cron_manager.sh` 中的 `PROMPT_*`），不依赖任何斜杠命令语法。
 
 ## 目录结构
 
@@ -123,7 +112,6 @@ miren-work-assistant-skill/
 ├── install.sh                 # 统一安装脚本
 ├── install-openclaw.sh        # OpenClaw 安装
 ├── install-claude-code.sh     # Claude Code 安装
-├── PRD-v1.md                  # 产品需求文档
 ├── README.md                  # 说明文档
 ├── skills/
 │   └── miren-work-assistant/
